@@ -14,7 +14,7 @@ let newuser;
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({extended:true}))
-app.use(express.static("./Backend/dist"))
+app.use(express.static("./dist"))
 
 
 
@@ -121,10 +121,13 @@ app.post("/api/getpendingorder", (req, res) => {
 });
 
 
+
+
+
 app.get("*", (req, res) => {
     res.sendFile(path.join(__dirname,"dist","index.html"));
 });
 
 app.listen(5000, () => {
-    console.log("Server is listening on port 4000");
+    console.log("Server is listening on port 5000");
 });
