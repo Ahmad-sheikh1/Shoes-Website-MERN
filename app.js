@@ -13,7 +13,7 @@ let newuser;
 
 app.use(cors());
 app.use(express.json());
-app.use(express.urlencoded({extended:true}))
+app.use(express.urlencoded({ extended: true }))
 app.use(express.static("./dist"))
 
 
@@ -90,7 +90,7 @@ app.post("/api/ShoesData", (req, res) => {
 
 app.post("/api/getshoesdata", (req, res) => {
     ShoesData.find().then((ShoesData) => {
-        res.json(ShoesData);    
+        res.json(ShoesData);
     }).catch((err) => {
         console.log("Data not get", err);
     })
@@ -125,7 +125,7 @@ app.post("/api/getpendingorder", (req, res) => {
 
 
 app.get("*", (req, res) => {
-    res.sendFile(path.join(__dirname,"dist","index.html"));
+    res.sendFile(path.join(__dirname, "dist", "index.html"));
 });
 
 app.listen(5000, () => {
