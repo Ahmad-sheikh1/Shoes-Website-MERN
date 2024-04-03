@@ -1,22 +1,140 @@
+require("dotenv").config();
 const express = require("express");
 const app = express();
 const RegistrationModel = require("./Mongodb");
 const jwt = require("jsonwebtoken");
 const cors = require("cors");
+const passport = require("passport");
 const ShoesData = require("./ShoesDataDB");
 const Pend_Order = require("./OrderDB");
 const path = require("path")
+const stripe = require('stripe')('sk_test_51OvsSeP47E7U0GK517TtyDvOccZNqJAIBwBJ0QVwCrLCsrBiaIpJd2ukrKazeBVswIlLywQV1JwaLv3QpwSW9Nbg00Ym4GG3hb');
+const session = require("express-session");
+const GoogleStrategy = require("passport-google-oauth20").Strategy;
+const googlemodel = require("./Googleuser");
+const { log } = require("console");
 let pendo;
 let newproduct;
-
 let newuser;
 
+
+app.use(session({
+    secret: "12345678987lkjhgfdszxfgui",
+    resave: false,
+    saveUninitialized: true
+}))
+app.use(passport.initialize());
+app.use(passport.session());
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }))
 app.use(express.static("./dist"))
+passport.use(
+    new GoogleStrategy({
+        clientID: "371552543043-i1qds267utv8u12fert1qg7dridca8am.apps.googleusercontent.com",
+        clientSecret: "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",
+        callbackURL: "/api/auth/google/callback",
+        scope: ["profile", "email"]
+    },
+        async (accessToken, refreshToken, profile, done) => {
+            // console.log(profile, "profile");
+            try {
+                let user = await googlemodel.findOne({ googleid: profile.id })
+
+                if (!user) {
+                    user = new googlemodel({
+                        googleid: profile.id,
+                        email: profile.emails[0].value,
+                        displayname: profile.displayname,
+                        Image: profile.photos[0].value
+                    })
+
+                    await user.save()
+                }
+
+                return done(null, user)
+
+            } catch (error) {
+                return done(error, null)
+            }
+        }
+    )
+);
+
+passport.serializeUser((user, done) => {
+    done(null, user)
+})
+
+passport.deserializeUser((user, done) => {
+    done(null, user)
+})
 
 
+// setup google auth
+
+app.get('/auth/google',
+    passport.authenticate('google', { scope: ['profile'] })
+);
+
+app.get('/api/auth/google/callback',
+    passport.authenticate('google',
+        {
+            successRedirect: "http://localhost:5173/Home",
+            failureRedirect: 'http://localhost:5173/Login'
+        })
+);
+
+app.get("/api/Google/Success", async (req, res) => {
+    // console.log("hellllo", req.user);
+
+    if (req.user) {
+        res.status(200).json({ message: "user goggle login", user: req.user })
+    }
+    else {
+        res.status(400).json({ message: "non authorized" })
+    }
+
+})
+
+app.get("/api/Google/logout", (req, res, next) => {
+    req.logOut(function (err) {
+        if (err) return next(err)
+        res.redirect("http://localhost:5173/Login")
+    })
+})
+
+// Stripe Payment
+
+app.post('/api/stripepayment', async (req, res) => {
+    try {
+        const products = req.body.map((product) => ({
+            price_data: {
+                currency: 'usd',
+                product_data: {
+                    name: product.productname,
+                    images: [product.img]
+                },
+                unit_amount: product.price * 100 // Stripe expects price in cents
+            },
+            quantity: 1
+        }));
+
+        const session = await stripe.checkout.sessions.create({
+            payment_method_types: ['card'],
+            line_items: products,
+            mode: 'payment',
+            success_url: 'http://localhost:5173/Home',
+            cancel_url: 'http://localhost:5173/Cart'
+        });
+
+        res.json({ id: session.id });
+    } catch (error) {
+        console.error('Error creating Stripe session:', error);
+        res.status(500).json({ error: 'Error creating Stripe session' });
+    }
+});
+
+//  other REST API-S 
 
 app.post("/api/Register", (req, res) => {
     console.log(req.body);
@@ -99,11 +217,12 @@ app.post("/api/getshoesdata", (req, res) => {
 app.post("/api/PendingOrders", (req, res) => {
     req.body.map((pro) => {
         pro.map((pr) => {
-            // console.log(pr);
+            console.log(pr);
             pendo = new Pend_Order({
                 Name: pr.productname,
                 Image: pr.img,
-                Price: pr.price
+                Price: pr.price,
+                Owner: pr.cartby
             })
 
             return pendo.save();
@@ -113,7 +232,8 @@ app.post("/api/PendingOrders", (req, res) => {
 
 
 app.post("/api/getpendingorder", (req, res) => {
-    Pend_Order.find().then((Pend_Order) => {
+    console.log(req.body);
+    Pend_Order.find({ Owner: req.body.user }).then((Pend_Order) => {
         res.json(Pend_Order);
     }).catch((err) => {
         console.log("pendo Data not get", err);
@@ -128,6 +248,6 @@ app.get("*", (req, res) => {
     res.sendFile(path.join(__dirname, "dist", "index.html"));
 });
 
-app.listen(6000, () => {
-    console.log("Server is listening on port 6000");
+app.listen(3000, () => {
+    console.log(`Server is listening on port 3000`);
 });

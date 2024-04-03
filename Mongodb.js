@@ -1,5 +1,7 @@
+require("dotenv").config();
 const mongoose = require("mongoose");
 
+process.env.DB
 const DB = "mongodb+srv://AhmadSh:raheel999@cluster0.1o1wb3p.mongodb.net/ShoeStoreDataBase";
 mongoose.connect(DB).then(() => {
     console.log("Successfull connect to DB");
